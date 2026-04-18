@@ -26,7 +26,7 @@
     z-index:10; padding:2rem;
   }
   #word {
-    font-size:clamp(1.8rem,5vw,3.2rem); font-weight:300;
+    font-size:clamp(1.4rem,3vw,2.2rem); font-weight:300;
     letter-spacing:0.15em; text-align:center; line-height:1.6;
     transition:opacity 1.5s ease,transform 1.5s ease;
     cursor:pointer; user-select:none;
@@ -102,7 +102,7 @@
 <canvas id="petal-canvas"></canvas>
 <div id="cursor"></div>
 <div id="stage">
-  <div id="word">2人だけの美しい世界</div>
+  <div id="word">二人だけの美しい世界</div>
   <div id="subtext"></div>
   <div id="keep-going">keep going...</div>
   <div id="hint">touch to begin</div>
@@ -150,16 +150,13 @@ function drawSinglePetal(cx, cy, len, wid, angle, color, alpha){
   rctx.rotate(angle);
   rctx.globalAlpha = alpha;
   rctx.beginPath();
-  // 先端から時計回り：左膨らみ→根元→右膨らみ→先端
-  rctx.moveTo(0, -len);                                          // 先端（上）
-  rctx.bezierCurveTo(-wid*0.8, -len*0.5, -wid*1.1, len*0.1, -wid*0.3, len*0.7); // 左カーブ
-  rctx.bezierCurveTo(-wid*0.1, len*0.95, wid*0.1, len*0.95, wid*0.3, len*0.7);  // 根元
-  rctx.bezierCurveTo( wid*1.1, len*0.1,  wid*0.8, -len*0.5, 0, -len);           // 右カーブ
+  rctx.moveTo(0, -len);
+  rctx.bezierCurveTo(-wid*1.2, -len*0.3, -wid*1.4, len*0.4, 0, len*0.9);
+  rctx.bezierCurveTo( wid*1.4,  len*0.4,  wid*1.2, -len*0.3, 0, -len);
   rctx.fillStyle = color;
   rctx.fill();
-  // 輪郭線でバラらしく
-  rctx.strokeStyle = `hsla(${color.match(/\d+/)?.[0]||280},60%,25%,${alpha*0.5})`;
-  rctx.lineWidth = 0.5;
+  rctx.strokeStyle = color;
+  rctx.lineWidth = 0.3;
   rctx.stroke();
   rctx.restore();
 }
@@ -168,34 +165,29 @@ function drawRose(cx, cy, baseSize, hue){
   const c1 = `hsl(${hue},58%,40%)`;
   const c2 = `hsl(${hue},62%,35%)`;
   const c3 = `hsl(${hue},66%,30%)`;
-
-  // 外層5枚
   for(let i=0;i<5;i++){
-    const a = (i/5)*Math.PI*2;
-    const px = cx + Math.cos(a)*baseSize*0.38;
-    const py = cy + Math.sin(a)*baseSize*0.38;
-    drawSinglePetal(px, py, baseSize*0.48, baseSize*0.18, a, c1, 0.18);
+    const a=(i/5)*Math.PI*2;
+    const px=cx+Math.cos(a)*baseSize*0.32;
+    const py=cy+Math.sin(a)*baseSize*0.32;
+    drawSinglePetal(px,py,baseSize*0.55,baseSize*0.28,a,c1,0.16);
   }
-  // 中層5枚（少しずらす）
   for(let i=0;i<5;i++){
-    const a = (i/5)*Math.PI*2 + Math.PI/5;
-    const px = cx + Math.cos(a)*baseSize*0.20;
-    const py = cy + Math.sin(a)*baseSize*0.20;
-    drawSinglePetal(px, py, baseSize*0.36, baseSize*0.13, a, c2, 0.20);
+    const a=(i/5)*Math.PI*2+Math.PI/5;
+    const px=cx+Math.cos(a)*baseSize*0.16;
+    const py=cy+Math.sin(a)*baseSize*0.16;
+    drawSinglePetal(px,py,baseSize*0.42,baseSize*0.22,a,c2,0.18);
   }
-  // 内層4枚
   for(let i=0;i<4;i++){
-    const a = (i/4)*Math.PI*2 + 0.5;
-    const px = cx + Math.cos(a)*baseSize*0.08;
-    const py = cy + Math.sin(a)*baseSize*0.08;
-    drawSinglePetal(px, py, baseSize*0.22, baseSize*0.09, a, c3, 0.22);
+    const a=(i/4)*Math.PI*2+0.5;
+    const px=cx+Math.cos(a)*baseSize*0.06;
+    const py=cy+Math.sin(a)*baseSize*0.06;
+    drawSinglePetal(px,py,baseSize*0.28,baseSize*0.16,a,c3,0.20);
   }
-  // 中心
   rctx.save();
-  rctx.globalAlpha = 0.18;
+  rctx.globalAlpha=0.15;
   rctx.beginPath();
-  rctx.arc(cx, cy, baseSize*0.07, 0, Math.PI*2);
-  rctx.fillStyle = `hsl(${hue},55%,22%)`;
+  rctx.arc(cx,cy,baseSize*0.06,0,Math.PI*2);
+  rctx.fillStyle=`hsl(${hue},55%,22%)`;
   rctx.fill();
   rctx.restore();
 }
@@ -273,11 +265,11 @@ let lastTapTime=0; // 連打防止
 drawRoses();
 
 const stages=[
-  {word:'2人だけの美しい世界',                          sub:'',                               bg:'#0a0a0f', hint:'touch to begin',            taps:1},
+  {word:'二人だけの美しい世界',                          sub:'',                               bg:'#0a0a0f', hint:'touch to begin',            taps:1},
   {word:'誰かに許されなくても',                          sub:'あなたとなら',                    bg:'#0d0a14', hint:'',                           taps:5},
   {word:'触れてしまったら\n危うくなってしまう距離もある',  sub:'— 美しい距離 —',                 bg:'#0e0a12', hint:'',                           taps:5},
-  {word:'世界が灰色でも\n2人の間だけは色があった',         sub:'gently touch the petals...',     bg:'#0c0a14', hint:'gently touch the petals...', taps:5, roses:'blue'},
-  {word:'いつかは\nこの現実の中を歩く',                   sub:'gently touch the petals...',     bg:'#0a0a12', hint:'gently touch the petals...', taps:5, roses:'purple'},
+  {word:'世界が灰色でも\n二人の間だけは色があった',         sub:'',                               bg:'#0c0a14', hint:'gently touch the petals...', taps:5, roses:'blue'},
+  {word:'いつかは\nこの現実の中を歩く',                   sub:'',                               bg:'#0a0a12', hint:'gently touch the petals...', taps:5, roses:'purple'},
   {word:'それでも\nあの時間は本物だった',                  sub:'',                               bg:'#0a0c12', hint:'',                           taps:8},
 ];
 const finalLines=['律しても、愛は来る。','','それは弱さではなく','生きている証だから。','','あなたの秘密の庭は','ずっとここにある。'];
@@ -343,7 +335,8 @@ function updateStage(){
     }
     if(s.roses){
       subtext.innerHTML=s.sub;
-      setTimeout(()=>subtext.style.opacity='0.5',800);
+      if(s.sub) setTimeout(()=>subtext.style.opacity='0.5',800);
+      else subtext.style.opacity='0';
     }
   },600);
 }

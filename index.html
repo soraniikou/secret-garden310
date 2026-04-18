@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<htmlgit lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>secret garden</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Noto+Serif+JP:wght@200;300&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: #0a0a0f;
+    color: rgba(255,255,255,0.75);
+    font-family: 'Cormorant Garamond','Noto Serif JP',serif;
+    min-height: 100vh;
+    overflow: hidden;
+    cursor: none;
+    transition: background 3s ease;
+  }
+  canvas { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; }
+  #c            { z-index:1; }
+  #rose-canvas  { z-index:2; opacity:0; transition:opacity 3s ease; }
+  #petal-canvas { z-index:15; opacity:0; transition:opacity 3s ease; }
+  #stage {
+    position:fixed; top:0; left:0; width:100%; height:100%;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    z-index:10; padding:2rem;
+  }
+  #word {
+    font-size:clamp(1.8rem,5vw,3.2rem); font-weight:300;
+    letter-spacing:0.15em; text-align:center; line-height:1.6;
+    transition:opacity 1.5s ease,transform 1.5s ease;
+    cursor:pointer; user-select:none;
+    text-shadow:0 0 40px rgba(255,255,255,0.1);
+    white-space:pre-line; position:relative;
+  }
+  #word::after {
+    content:''; position:absolute; bottom:-8px; left:50%;
+    transform:translateX(-50%); width:0; height:1px;
+    background:rgba(255,255,255,0.4); transition:width 2s ease;
+  }
+  #word.touched::after { width:100%; }
+  #hint {
+    margin-top:3rem; font-size:0.85rem; letter-spacing:0.3em;
+    text-transform:lowercase; font-style:italic;
+    transition:opacity 1s ease; animation:breathe 3s ease-in-out infinite;
+    color:rgba(255,255,255,0.75);
+  }
+  @keyframes breathe { 0%,100%{opacity:0.55} 50%{opacity:0.9} }
+  #subtext {
+    margin-top:1.5rem; font-size:clamp(0.75rem,2vw,0.9rem);
+    font-style:italic; letter-spacing:0.1em; opacity:0;
+    text-align:center; line-height:2; max-width:400px;
+    transition:opacity 2s ease; color:rgba(255,255,255,0.5);
+  }
+  #keep-going {
+    margin-top:2.5rem; font-size:0.65rem; letter-spacing:0.3em;
+    color:rgba(255,255,255,0.35); font-style:italic;
+    opacity:0; transition:opacity 1.5s ease; pointer-events:none;
+  }
+  #cursor {
+    position:fixed; width:6px; height:6px; border-radius:50%;
+    background:rgba(255,255,255,0.6); pointer-events:none;
+    z-index:100; transform:translate(-50%,-50%); mix-blend-mode:screen;
+  }
+  #final {
+    position:fixed; top:0; left:0; width:100%; height:100%;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    z-index:20; opacity:0; pointer-events:none;
+    transition:opacity 3s ease; padding:3rem; text-align:center;
+  }
+  #final.visible { opacity:1; pointer-events:auto; }
+  #final-text {
+    font-size:clamp(1rem,3vw,1.6rem); font-weight:300;
+    line-height:2.2; letter-spacing:0.1em;
+    color:rgba(255,255,255,0.8); max-width:500px;
+  }
+  #final-sub { margin-top:3rem; font-size:0.75rem; letter-spacing:0.25em; color:rgba(255,255,255,0.3); font-style:italic; }
+  #restart {
+    margin-top:2rem; font-size:0.65rem; letter-spacing:0.3em;
+    color:rgba(255,255,255,0.45); cursor:pointer;
+    border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.04);
+    font-family:inherit; font-style:italic; padding:0.4rem 1.2rem;
+    border-radius:20px; transition:color 0.5s ease,border-color 0.5s ease;
+  }
+  #restart:hover { color:rgba(255,255,255,0.85); border-color:rgba(255,255,255,0.45); }
+  #start-over {
+    margin-top:0.8rem; font-size:0.6rem; letter-spacing:0.25em;
+    color:rgba(255,255,255,0.25); cursor:pointer; border:none; background:none;
+    font-family:inherit; font-style:italic; transition:color 0.5s ease;
+  }
+  #start-over:hover { color:rgba(255,255,255,0.55); }
+  .ripple {
+    position:fixed; border-radius:50%; pointer-events:none; z-index:5;
+    transform:translate(-50%,-50%) scale(0); animation:ripple-out 2s ease-out forwards;
+  }
+  @keyframes ripple-out { to{transform:translate(-50%,-50%) scale(1);opacity:0} }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<canvas id="rose-canvas"></canvas>
+<canvas id="petal-canvas"></canvas>
+<div id="cursor"></div>
+<div id="stage">
+  <div id="word">2人だけの美しい世界</div>
+  <div id="subtext"></div>
+  <div id="keep-going">keep going...</div>
+  <div id="hint">touch to begin</div>
+</div>
+<div id="final">
+  <div id="final-text"></div>
+  <div id="final-sub"></div>
+  <button id="restart">← back</button>
+</div>
+
+<script>
+// ---- Particle canvas ----
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+canvas.width = innerWidth; canvas.height = innerHeight;
+window.addEventListener('resize', () => { canvas.width=innerWidth; canvas.height=innerHeight; });
+
+const particles = [];
+class Particle {
+  constructor(x,y,stage) {
+    this.x=x; this.y=y;
+    this.vx=(Math.random()-0.5)*1.2; this.vy=(Math.random()-0.5)*1.2-0.3;
+    this.life=1; this.decay=0.008+Math.random()*0.008; this.size=Math.random()*2+0.5;
+    const c = stage<2?['120,120,150']:stage<3?['180,160,200','200,180,220']:['255,220,180','220,180,255'];
+    this.color=c[Math.floor(Math.random()*c.length)];
+  }
+  update(){this.x+=this.vx;this.y+=this.vy;this.vy-=0.01;this.life-=this.decay;}
+  draw(){ctx.globalAlpha=this.life*0.6;ctx.fillStyle=`rgb(${this.color})`;ctx.beginPath();ctx.arc(this.x,this.y,this.size,0,Math.PI*2);ctx.fill();}
+}
+(function loop(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  for(let i=particles.length-1;i>=0;i--){particles[i].update();particles[i].draw();if(particles[i].life<=0)particles.splice(i,1);}
+  requestAnimationFrame(loop);
+})();
+
+// ---- Purple rose background (stage 4) ----
+const roseCanvas = document.getElementById('rose-canvas');
+const rctx = roseCanvas.getContext('2d');
+roseCanvas.width = innerWidth; roseCanvas.height = innerHeight;
+window.addEventListener('resize', ()=>{ roseCanvas.width=innerWidth; roseCanvas.height=innerHeight; if(typeof currentStage!=='undefined') drawRoses(); });
+
+function drawSinglePetal(cx, cy, len, wid, angle, color, alpha){
+  rctx.save();
+  rctx.translate(cx, cy);
+  rctx.rotate(angle);
+  rctx.globalAlpha = alpha;
+  rctx.beginPath();
+  // 先端から時計回り：左膨らみ→根元→右膨らみ→先端
+  rctx.moveTo(0, -len);                                          // 先端（上）
+  rctx.bezierCurveTo(-wid*0.8, -len*0.5, -wid*1.1, len*0.1, -wid*0.3, len*0.7); // 左カーブ
+  rctx.bezierCurveTo(-wid*0.1, len*0.95, wid*0.1, len*0.95, wid*0.3, len*0.7);  // 根元
+  rctx.bezierCurveTo( wid*1.1, len*0.1,  wid*0.8, -len*0.5, 0, -len);           // 右カーブ
+  rctx.fillStyle = color;
+  rctx.fill();
+  // 輪郭線でバラらしく
+  rctx.strokeStyle = `hsla(${color.match(/\d+/)?.[0]||280},60%,25%,${alpha*0.5})`;
+  rctx.lineWidth = 0.5;
+  rctx.stroke();
+  rctx.restore();
+}
+
+function drawRose(cx, cy, baseSize, hue){
+  const c1 = `hsl(${hue},58%,40%)`;
+  const c2 = `hsl(${hue},62%,35%)`;
+  const c3 = `hsl(${hue},66%,30%)`;
+
+  // 外層5枚
+  for(let i=0;i<5;i++){
+    const a = (i/5)*Math.PI*2;
+    const px = cx + Math.cos(a)*baseSize*0.38;
+    const py = cy + Math.sin(a)*baseSize*0.38;
+    drawSinglePetal(px, py, baseSize*0.48, baseSize*0.18, a, c1, 0.18);
+  }
+  // 中層5枚（少しずらす）
+  for(let i=0;i<5;i++){
+    const a = (i/5)*Math.PI*2 + Math.PI/5;
+    const px = cx + Math.cos(a)*baseSize*0.20;
+    const py = cy + Math.sin(a)*baseSize*0.20;
+    drawSinglePetal(px, py, baseSize*0.36, baseSize*0.13, a, c2, 0.20);
+  }
+  // 内層4枚
+  for(let i=0;i<4;i++){
+    const a = (i/4)*Math.PI*2 + 0.5;
+    const px = cx + Math.cos(a)*baseSize*0.08;
+    const py = cy + Math.sin(a)*baseSize*0.08;
+    drawSinglePetal(px, py, baseSize*0.22, baseSize*0.09, a, c3, 0.22);
+  }
+  // 中心
+  rctx.save();
+  rctx.globalAlpha = 0.18;
+  rctx.beginPath();
+  rctx.arc(cx, cy, baseSize*0.07, 0, Math.PI*2);
+  rctx.fillStyle = `hsl(${hue},55%,22%)`;
+  rctx.fill();
+  rctx.restore();
+}
+
+const roses = [
+  {x:0.13,y:0.18,s:0.13,h:280},{x:0.84,y:0.14,s:0.10,h:270},
+  {x:0.50,y:0.74,s:0.12,h:290},{x:0.07,y:0.77,s:0.09,h:275},
+  {x:0.87,y:0.62,s:0.11,h:285},
+];
+const blueRoses = [
+  {x:0.20,y:0.25,s:0.11,h:200},{x:0.78,y:0.20,s:0.09,h:195},
+  {x:0.50,y:0.68,s:0.12,h:205},{x:0.10,y:0.65,s:0.10,h:198},
+  {x:0.85,y:0.70,s:0.10,h:202},
+];
+function drawRoses(){
+  rctx.clearRect(0,0,roseCanvas.width,roseCanvas.height);
+  const stage = typeof currentStage !== 'undefined' ? currentStage : 0;
+  const list = stage===3 ? blueRoses : roses;
+  list.forEach(r=>drawRose(r.x*roseCanvas.width, r.y*roseCanvas.height, r.s*Math.min(roseCanvas.width,roseCanvas.height), r.h));
+}
+// ---- Falling petals (final) — 13枚 ----
+const petalCanvas = document.getElementById('petal-canvas');
+const pctx = petalCanvas.getContext('2d');
+petalCanvas.width = innerWidth; petalCanvas.height = innerHeight;
+window.addEventListener('resize', ()=>{ petalCanvas.width=innerWidth; petalCanvas.height=innerHeight; });
+
+const petals = [];
+let petalActive = false;
+
+class Petal {
+  constructor(){ this.reset(); this.y=Math.random()*innerHeight; }
+  reset(){
+    this.x=Math.random()*innerWidth; this.y=-20;
+    this.size=8+Math.random()*12; this.speedY=0.3+Math.random()*0.5;
+    this.speedX=(Math.random()-0.5)*0.4; this.angle=Math.random()*Math.PI*2;
+    this.rotSpeed=(Math.random()-0.5)*0.015; this.sway=0.008+Math.random()*0.012;
+    this.swayOffset=Math.random()*Math.PI*2; this.opacity=0.5+Math.random()*0.4;
+    const c=[[130,10,25],[150,15,30],[120,8,22],[160,20,35],[140,12,28]][Math.floor(Math.random()*5)];
+    this.r=c[0];this.g=c[1];this.b=c[2];
+  }
+  update(){
+    this.y+=this.speedY; this.x+=this.speedX+Math.sin(this.y*this.sway+this.swayOffset)*0.6;
+    this.angle+=this.rotSpeed; if(this.y>innerHeight+30)this.reset();
+  }
+  draw(){
+    pctx.save(); pctx.translate(this.x,this.y); pctx.rotate(this.angle); pctx.globalAlpha=this.opacity;
+    pctx.beginPath();
+    pctx.moveTo(0,-this.size);
+    pctx.bezierCurveTo(this.size*0.8,-this.size*0.5, this.size*0.9,this.size*0.3, 0,this.size*0.6);
+    pctx.bezierCurveTo(-this.size*0.9,this.size*0.3, -this.size*0.8,-this.size*0.5, 0,-this.size);
+    pctx.fillStyle=`rgba(${this.r},${this.g},${this.b},1)`; pctx.fill();
+    pctx.beginPath();
+    pctx.moveTo(0,-this.size*0.8);
+    pctx.bezierCurveTo(this.size*0.3,-this.size*0.4, this.size*0.2,this.size*0.1, 0,this.size*0.2);
+    pctx.bezierCurveTo(-this.size*0.15,this.size*0.1, -this.size*0.2,-this.size*0.4, 0,-this.size*0.8);
+    pctx.fillStyle=`rgba(255,120,130,0.2)`; pctx.fill();
+    pctx.restore();
+  }
+}
+for(let i=0;i<13;i++) petals.push(new Petal());
+(function loopPetals(){
+  if(!petalActive){requestAnimationFrame(loopPetals);return;}
+  pctx.clearRect(0,0,petalCanvas.width,petalCanvas.height);
+  petals.forEach(p=>{p.update();p.draw();});
+  requestAnimationFrame(loopPetals);
+})();
+
+// ---- Cursor ----
+const cursor=document.getElementById('cursor');
+document.addEventListener('mousemove',e=>{cursor.style.left=e.clientX+'px';cursor.style.top=e.clientY+'px';});
+
+// ---- State ----
+let taps=0, currentStage=0;
+let lastTapTime=0; // 連打防止
+drawRoses();
+
+const stages=[
+  {word:'2人だけの美しい世界',                          sub:'',                               bg:'#0a0a0f', hint:'touch to begin',            taps:1},
+  {word:'誰かに許されなくても',                          sub:'あなたとなら',                    bg:'#0d0a14', hint:'',                           taps:5},
+  {word:'触れてしまったら\n危うくなってしまう距離もある',  sub:'— 美しい距離 —',                 bg:'#0e0a12', hint:'',                           taps:5},
+  {word:'世界が灰色でも\n2人の間だけは色があった',         sub:'gently touch the petals...',     bg:'#0c0a14', hint:'gently touch the petals...', taps:5, roses:'blue'},
+  {word:'いつかは\nこの現実の中を歩く',                   sub:'gently touch the petals...',     bg:'#0a0a12', hint:'gently touch the petals...', taps:5, roses:'purple'},
+  {word:'それでも\nあの時間は本物だった',                  sub:'',                               bg:'#0a0c12', hint:'',                           taps:8},
+];
+const finalLines=['律しても、愛は来る。','','それは弱さではなく','生きている証だから。','','あなたの秘密の庭は','ずっとここにある。'];
+
+// ステージごとのタップ累計しきい値を計算
+const thresholds = stages.reduce((acc,s,i)=>{ acc.push((acc[i-1]||0)+s.taps); return acc; },[]);
+
+const word=document.getElementById('word');
+const subtext=document.getElementById('subtext');
+const hint=document.getElementById('hint');
+const final=document.getElementById('final');
+const finalText=document.getElementById('final-text');
+const kg=document.getElementById('keep-going');
+
+function spawnParticles(x,y,n=12){for(let i=0;i<n;i++)particles.push(new Particle(x,y,currentStage));}
+function createRipple(x,y){
+  const r=document.createElement('div'); r.className='ripple';
+  const sz=150+taps*15, a=0.04+currentStage*0.03;
+  r.style.cssText=`left:${x}px;top:${y}px;width:${sz}px;height:${sz}px;border:1px solid rgba(255,255,255,${a})`;
+  document.body.appendChild(r); setTimeout(()=>r.remove(),2000);
+}
+
+// 花びら揺れエフェクト（水色・紫バラ場面）
+function shimmerRoses(){
+  rctx.save();
+  rctx.globalAlpha=0.06;
+  rctx.fillStyle='rgba(255,255,255,1)';
+  const list = currentStage===3 ? blueRoses : roses;
+  list.forEach(r=>{
+    const cx=r.x*roseCanvas.width, cy=r.y*roseCanvas.height;
+    const sz=r.s*Math.min(roseCanvas.width,roseCanvas.height)*0.15;
+    rctx.beginPath(); rctx.arc(cx,cy,sz,0,Math.PI*2); rctx.fill();
+  });
+  rctx.restore();
+  setTimeout(()=>drawRoses(),300);
+}
+
+function updateStage(){
+  const s=stages[currentStage];
+  word.style.opacity='0'; word.style.transform='translateY(10px)'; subtext.style.opacity='0';
+
+  // バラ背景の切り替え
+  if(s.roses==='blue'){ drawRoses(); setTimeout(()=>roseCanvas.style.opacity='1',400); }
+  else if(s.roses==='purple'||currentStage===5){ drawRoses(); setTimeout(()=>roseCanvas.style.opacity='1',400); }
+  else { roseCanvas.style.opacity='0'; }
+
+  setTimeout(()=>{
+    word.textContent = s.word||'';
+    document.body.style.background=s.bg;
+    word.style.opacity= s.word?'1':'0';
+    word.style.transform='translateY(0)';
+
+    // hint更新
+    if(s.roses){
+      hint.style.display='block';
+      hint.style.opacity='0.75';
+      hint.textContent = s.hint;
+    }
+
+    if(s.sub&&!s.roses){
+      subtext.innerHTML=s.sub.replace(/\n/g,'<br>');
+      setTimeout(()=>subtext.style.opacity='1',800);
+    }
+    if(s.roses){
+      subtext.innerHTML=s.sub;
+      setTimeout(()=>subtext.style.opacity='0.5',800);
+    }
+  },600);
+}
+
+function showFinal(){
+  word.style.opacity='0'; subtext.style.opacity='0'; roseCanvas.style.opacity='0';
+  setTimeout(()=>{
+    document.body.style.background='#0a0810';
+    final.classList.add('visible');
+    finalText.innerHTML=finalLines.map(l=>l?`<span>${l}</span>`:'<br>').join('<br>');
+    setTimeout(()=>{ petalActive=true; petalCanvas.style.opacity='1'; },1000);
+  },1000);
+}
+
+// タップ対象を全画面に
+document.getElementById('stage').addEventListener('click',handleTap);
+document.getElementById('stage').addEventListener('touchstart',e=>{e.preventDefault();handleTap(e.touches[0]);},{passive:false});
+
+function handleTap(e){
+  // 連打防止：0.8秒インターバル
+  const now = Date.now();
+  if(now - lastTapTime < 800) return;
+  lastTapTime = now;
+
+  const x=e.clientX||innerWidth/2, y=e.clientY||innerHeight/2;
+  taps++;
+  spawnParticles(x,y,6+currentStage*3);
+  createRipple(x,y);
+  word.classList.add('touched');
+
+  // バラ場面では揺れエフェクト
+  if(stages[currentStage]?.roses) shimmerRoses();
+
+  if(taps===1){
+    hint.style.opacity='0'; setTimeout(()=>hint.style.display='none',1000);
+    setTimeout(()=>kg.style.opacity='1',600); setTimeout(()=>kg.style.opacity='0',3500);
+  }
+
+  // しきい値でステージ進行
+  if(currentStage < stages.length && taps >= thresholds[currentStage]){
+    if(currentStage === stages.length-1){ showFinal(); }
+    else { currentStage++; updateStage(); }
+  }
+}
+
+document.getElementById('restart').addEventListener('click',()=>{
+  final.classList.remove('visible'); petalActive=false;
+  petalCanvas.style.opacity='0'; pctx.clearRect(0,0,petalCanvas.width,petalCanvas.height);
+  currentStage=stages.length-1; taps=thresholds[stages.length-2];
+  const s=stages[currentStage];
+  word.textContent=s.word; word.style.opacity='1'; word.style.transform='translateY(0)';
+  document.body.style.background=s.bg;
+  subtext.innerHTML=s.sub.replace(/\n/g,'<br>');
+  drawRoses();
+  setTimeout(()=>{subtext.style.opacity='1'; roseCanvas.style.opacity='1';},400);
+});
+
+document.getElementById('start-over')?.addEventListener('click',()=>{
+  taps=0; currentStage=0; final.classList.remove('visible');
+  petalActive=false; petalCanvas.style.opacity='0'; roseCanvas.style.opacity='0';
+  pctx.clearRect(0,0,petalCanvas.width,petalCanvas.height);
+  word.textContent=stages[0].word; word.style.opacity='1'; word.style.transform='translateY(0)';
+  word.classList.remove('touched'); subtext.style.opacity='0';
+  document.body.style.background=stages[0].bg; kg.style.opacity='0';
+  lastTapTime=0;
+  hint.style.display='block'; hint.textContent='touch to begin';
+  setTimeout(()=>hint.style.opacity='0.75',100);
+});
+</script>
+</body>
+</html>

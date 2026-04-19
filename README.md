@@ -14,3 +14,14 @@
   そんな人間の形をアプリで表現してみました
 
   https://secret-garden310.vercel.app
+<p align="center">
+  <img src="スクリーンショット 2026-04-19 164101.png" width="48%">
+  <img src="スクリーンショット 2026-04-19 164142.png" width="48%">
+</p>
+<p align="center">
+  <img src="スクリーンショット 2026-04-19 164236.png" width="48%">
+  <img src="スクリーンショット 2026-04-19 164311.png" width="48%">
+</p>
+<p align="center">
+  <img src="スクリーンショット 2026-04-19 164354.png" width="48%">
+</p>

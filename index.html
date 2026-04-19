@@ -39,6 +39,33 @@
     background:rgba(255,255,255,0.4); transition:width 2s ease;
   }
   #word.touched::after { width:100%; }
+  #word-note {
+    margin-top:0.75rem; font-size:clamp(0.65rem,1.8vw,0.82rem);
+    letter-spacing:0.12em; color:rgba(255,255,255,0.42);
+    text-align:center; max-width:90vw;
+    opacity:0; transition:opacity 0.9s ease; pointer-events:none;
+  }
+  #word-note.visible { opacity:1; }
+  #star-name-overlay {
+    position:fixed; inset:0; z-index:11; pointer-events:none;
+  }
+  .star-name-slot {
+    position:absolute; pointer-events:none;
+    transform:translate(-50%,0); text-align:center;
+  }
+  .star-name-input {
+    pointer-events:auto; cursor:text;
+    width:min(22vw,7.5rem); min-width:4rem;
+    padding:0.15rem 0.25rem 0.05rem;
+    font-family:'Noto Serif JP','Cormorant Garamond',serif;
+    font-size:clamp(0.62rem,1.6vw,0.78rem); letter-spacing:0.08em;
+    color:rgba(255,255,255,0.88);
+    background:transparent; border:none;
+    border-bottom:1px solid rgba(255,255,255,0.45);
+    outline:none; text-align:center;
+  }
+  .star-name-input::placeholder { color:rgba(255,255,255,0.2); }
+  .star-name-input:focus { border-bottom-color:rgba(255,255,255,0.75); }
   #hint {
     margin-top:3rem; font-size:0.85rem; letter-spacing:0.3em;
     text-transform:lowercase; font-style:italic;
@@ -105,8 +132,16 @@
 <canvas id="rose-canvas"></canvas>
 <canvas id="petal-canvas"></canvas>
 <div id="cursor"></div>
+<div id="star-name-overlay" hidden>
+  <div class="star-name-slot"><input type="text" class="star-name-input" maxlength="24" autocomplete="off" aria-label="名前 1" /></div>
+  <div class="star-name-slot"><input type="text" class="star-name-input" maxlength="24" autocomplete="off" aria-label="名前 2" /></div>
+  <div class="star-name-slot"><input type="text" class="star-name-input" maxlength="24" autocomplete="off" aria-label="名前 3" /></div>
+  <div class="star-name-slot"><input type="text" class="star-name-input" maxlength="24" autocomplete="off" aria-label="名前 4" /></div>
+  <div class="star-name-slot"><input type="text" class="star-name-input" maxlength="24" autocomplete="off" aria-label="名前 5" /></div>
+</div>
 <div id="stage">
   <div id="word">二人だけの美しい世界</div>
+  <div id="word-note"></div>
   <div id="subtext"></div>
   <button type="button" id="stage-next">→next</button>
   <div id="hint">touch to begin</div>
@@ -165,10 +200,18 @@ function drawSinglePetal(cx, cy, len, wid, angle, color, alpha){
   rctx.restore();
 }
 
-function drawRose(cx, cy, baseSize, hue){
-  const c1 = `hsl(${hue},58%,40%)`;
-  const c2 = `hsl(${hue},62%,35%)`;
-  const c3 = `hsl(${hue},66%,30%)`;
+function drawRose(cx, cy, baseSize, colorIn){
+  const p = typeof colorIn === 'number'
+    ? { h: colorIn, s1:58, s2:62, s3:66, l1:40, l2:35, l3:30, lc:22, sc:55 }
+    : {
+        h: colorIn.h,
+        s1: colorIn.s1 ?? 58, s2: colorIn.s2 ?? 62, s3: colorIn.s3 ?? 66,
+        l1: colorIn.l1 ?? 40, l2: colorIn.l2 ?? 35, l3: colorIn.l3 ?? 30,
+        lc: colorIn.lc ?? 22, sc: colorIn.sc ?? 55,
+      };
+  const c1 = `hsl(${p.h},${p.s1}%,${p.l1}%)`;
+  const c2 = `hsl(${p.h},${p.s2}%,${p.l2}%)`;
+  const c3 = `hsl(${p.h},${p.s3}%,${p.l3}%)`;
   for(let i=0;i<5;i++){
     const a=(i/5)*Math.PI*2;
     const px=cx+Math.cos(a)*baseSize*0.32;
@@ -191,7 +234,7 @@ function drawRose(cx, cy, baseSize, hue){
   rctx.globalAlpha=0.15;
   rctx.beginPath();
   rctx.arc(cx,cy,baseSize*0.06,0,Math.PI*2);
-  rctx.fillStyle=`hsl(${hue},55%,22%)`;
+  rctx.fillStyle=`hsl(${p.h},${p.sc}%,${p.lc}%)`;
   rctx.fill();
   rctx.restore();
 }
@@ -206,11 +249,24 @@ const blueRoses = [
   {x:0.50,y:0.68,s:0.12,h:205},{x:0.10,y:0.65,s:0.10,h:198},
   {x:0.85,y:0.70,s:0.10,h:202},
 ];
+// 一番星シーン（ステージ5）：1紫 2赤 3暗めの黄 4紺 5深緑
+const starRosePalette = [
+  { h: 280 },
+  { h: 2, s1:62, s2:66, s3:70, l1:44, l2:38, l3:32, lc:24, sc:58 },
+  { h: 46, s1:48, s2:52, s3:56, l1:36, l2:30, l3:24, lc:20, sc:50 },
+  { h: 232, s1:52, s2:56, s3:60, l1:28, l2:23, l3:18, lc:16, sc:48 },
+  { h: 152, s1:40, s2:44, s3:48, l1:30, l2:24, l3:19, lc:15, sc:42 },
+];
 function drawRoses(){
   rctx.clearRect(0,0,roseCanvas.width,roseCanvas.height);
   const stage = typeof currentStage !== 'undefined' ? currentStage : 0;
   const list = stage===3 ? blueRoses : roses;
-  list.forEach(r=>drawRose(r.x*roseCanvas.width, r.y*roseCanvas.height, r.s*Math.min(roseCanvas.width,roseCanvas.height), r.h));
+  const minSz = Math.min(roseCanvas.width,roseCanvas.height);
+  list.forEach((r,i)=>{
+    const cx=r.x*roseCanvas.width, cy=r.y*roseCanvas.height, bs=r.s*minSz;
+    const color = stage===5 ? starRosePalette[i] : r.h;
+    drawRose(cx, cy, bs, color);
+  });
 }
 // ---- Falling petals (final) — 13枚 ----
 const petalCanvas = document.getElementById('petal-canvas');
@@ -279,11 +335,45 @@ const stages=[
 const finalLines=['蓋をしても、愛は来る','','それは弱さではなく','生きている証だから。','','ずっと二人はここにいる。'];
 
 const word=document.getElementById('word');
+const wordNote=document.getElementById('word-note');
 const subtext=document.getElementById('subtext');
 const hint=document.getElementById('hint');
 const final=document.getElementById('final');
 const finalText=document.getElementById('final-text');
 const stageNext=document.getElementById('stage-next');
+const starNameOverlay=document.getElementById('star-name-overlay');
+
+function layoutStarNameSlots(){
+  if(!starNameOverlay || starNameOverlay.hidden) return;
+  const minSz = Math.min(innerWidth, innerHeight);
+  roses.forEach((r,i)=>{
+    const slot = starNameOverlay.children[i];
+    if(!slot) return;
+    const off = Math.max(20, r.s * minSz * 0.52);
+    slot.style.left = (r.x * 100) + '%';
+    slot.style.top = `calc(${(r.y * 100)}% + ${off}px)`;
+  });
+}
+
+function syncStarSceneUi(show){
+  if(show){
+    wordNote.textContent='好きな人の名前を書いて';
+    wordNote.classList.add('visible');
+    starNameOverlay.hidden=false;
+    layoutStarNameSlots();
+  } else {
+    wordNote.textContent='';
+    wordNote.classList.remove('visible');
+    starNameOverlay.hidden=true;
+  }
+}
+
+document.querySelectorAll('.star-name-input').forEach(inp=>{
+  inp.addEventListener('click',e=>e.stopPropagation());
+  inp.addEventListener('touchstart',e=>e.stopPropagation(),{passive:true});
+  inp.addEventListener('focus',e=>e.stopPropagation());
+});
+window.addEventListener('resize',()=>{ if(currentStage===5) layoutStarNameSlots(); });
 
 function syncStageNext(){
   const show = currentStage>=1 && currentStage<stages.length && !final.classList.contains('visible');
@@ -299,7 +389,7 @@ function createRipple(x,y){
   document.body.appendChild(r); setTimeout(()=>r.remove(),2000);
 }
 
-// 花びら揺れエフェクト（水色・紫バラ場面）
+// 花びら揺れエフェクト（水色・紫・一番星バラ場面）
 function shimmerRoses(){
   rctx.save();
   rctx.globalAlpha=0.06;
@@ -331,6 +421,9 @@ function updateStage(){
 
     if(s.roses){ hint.style.display='none'; hint.style.opacity='0'; }
 
+    if(currentStage===5) syncStarSceneUi(true);
+    else syncStarSceneUi(false);
+
     if(s.sub&&!s.roses){
       subtext.innerHTML=s.sub.replace(/\n/g,'<br>');
       setTimeout(()=>subtext.style.opacity='1',800);
@@ -345,6 +438,7 @@ function updateStage(){
 }
 
 function showFinal(){
+  syncStarSceneUi(false);
   stageNext.style.opacity='0'; stageNext.style.pointerEvents='none';
   word.style.opacity='0'; subtext.style.opacity='0'; roseCanvas.style.opacity='0';
   setTimeout(()=>{
@@ -380,8 +474,8 @@ function handleTap(e){
   createRipple(x,y);
   word.classList.add('touched');
 
-  // バラ場面では揺れエフェクト
-  if(stages[currentStage]?.roses) shimmerRoses();
+  // バラ場面・一番星場面では揺れエフェクト
+  if(stages[currentStage]?.roses || currentStage===5) shimmerRoses();
 
   if(taps===1){
     hint.style.opacity='0'; setTimeout(()=>hint.style.display='none',1000);
@@ -403,7 +497,11 @@ document.getElementById('restart').addEventListener('click',()=>{
   document.body.style.background=s.bg;
   subtext.innerHTML=s.sub.replace(/\n/g,'<br>');
   drawRoses();
-  setTimeout(()=>{subtext.style.opacity='1'; roseCanvas.style.opacity='1'; syncStageNext();},400);
+  setTimeout(()=>{
+    subtext.style.opacity='1'; roseCanvas.style.opacity='1';
+    syncStarSceneUi(true);
+    syncStageNext();
+  },400);
 });
 
 document.getElementById('start-over')?.addEventListener('click',()=>{
@@ -412,6 +510,7 @@ document.getElementById('start-over')?.addEventListener('click',()=>{
   pctx.clearRect(0,0,petalCanvas.width,petalCanvas.height);
   word.textContent=stages[0].word; word.style.opacity='1'; word.style.transform='translateY(0)';
   word.classList.remove('touched'); subtext.style.opacity='0';
+  syncStarSceneUi(false);
   document.body.style.background=stages[0].bg;
   lastTapTime=0;
   hint.style.display='block'; hint.textContent='touch to begin';

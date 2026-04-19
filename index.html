@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<htmlgit lang="ja">
+<html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -52,11 +52,15 @@
     text-align:center; line-height:2; max-width:400px;
     transition:opacity 2s ease; color:rgba(255,255,255,0.5);
   }
-  #keep-going {
-    margin-top:2.5rem; font-size:0.65rem; letter-spacing:0.3em;
-    color:rgba(255,255,255,0.35); font-style:italic;
-    opacity:0; transition:opacity 1.5s ease; pointer-events:none;
+  #stage-next {
+    margin-top:2.5rem; font-size:0.65rem; letter-spacing:0.25em;
+    color:rgba(255,255,255,0.55); cursor:pointer;
+    border:1px solid rgba(255,255,255,0.22); background:rgba(255,255,255,0.05);
+    font-family:inherit; font-style:italic; padding:0.45rem 1.4rem;
+    border-radius:20px; transition:opacity 0.6s ease,color 0.5s ease,border-color 0.5s ease;
+    opacity:0; pointer-events:none;
   }
+  #stage-next:hover { color:rgba(255,255,255,0.9); border-color:rgba(255,255,255,0.45); }
   #cursor {
     position:fixed; width:6px; height:6px; border-radius:50%;
     background:rgba(255,255,255,0.6); pointer-events:none;
@@ -104,7 +108,7 @@
 <div id="stage">
   <div id="word">二人だけの美しい世界</div>
   <div id="subtext"></div>
-  <div id="keep-going">keep going...</div>
+  <button type="button" id="stage-next">→next</button>
   <div id="hint">touch to begin</div>
 </div>
 <div id="final">
@@ -268,21 +272,24 @@ const stages=[
   {word:'二人だけの美しい世界',                          sub:'',                               bg:'#0a0a0f', hint:'touch to begin',            taps:1},
   {word:'誰かに許されなくても',                          sub:'あなたとなら',                    bg:'#0d0a14', hint:'',                           taps:5},
   {word:'触れてしまったら\n危うくなってしまう距離もある',  sub:'— 美しい距離 —',                 bg:'#0e0a12', hint:'',                           taps:5},
-  {word:'世界が灰色でも\n二人の間だけは色があった',         sub:'',                               bg:'#0c0a14', hint:'gently touch the petals...', taps:5, roses:'blue'},
-  {word:'いつかは\nこの現実の中を歩く',                   sub:'',                               bg:'#0a0a12', hint:'gently touch the petals...', taps:5, roses:'purple'},
-  {word:'それでも\nあの時間は本物だった',                  sub:'',                               bg:'#0a0c12', hint:'',                           taps:8},
+  {word:'世界が灰色でも\n二人の間だけは色があった',         sub:'',                               bg:'#0c0a14', hint:'', taps:5, roses:'blue'},
+  {word:'いつかは\nこの現実の中を歩く',                   sub:'',                               bg:'#0a0a12', hint:'', taps:5, roses:'purple'},
+  {word:'あなたの一番星はだれですか？',                  sub:'',                               bg:'#0a0c12', hint:'', taps:8},
 ];
-const finalLines=['律しても、愛は来る。','','それは弱さではなく','生きている証だから。','','あなたの秘密の庭は','ずっとここにある。'];
-
-// ステージごとのタップ累計しきい値を計算
-const thresholds = stages.reduce((acc,s,i)=>{ acc.push((acc[i-1]||0)+s.taps); return acc; },[]);
+const finalLines=['蓋をしても、愛は来る','','それは弱さではなく','生きている証だから。','','ずっと二人はここにいる。'];
 
 const word=document.getElementById('word');
 const subtext=document.getElementById('subtext');
 const hint=document.getElementById('hint');
 const final=document.getElementById('final');
 const finalText=document.getElementById('final-text');
-const kg=document.getElementById('keep-going');
+const stageNext=document.getElementById('stage-next');
+
+function syncStageNext(){
+  const show = currentStage>=1 && currentStage<stages.length && !final.classList.contains('visible');
+  stageNext.style.opacity = show ? '1' : '0';
+  stageNext.style.pointerEvents = show ? 'auto' : 'none';
+}
 
 function spawnParticles(x,y,n=12){for(let i=0;i<n;i++)particles.push(new Particle(x,y,currentStage));}
 function createRipple(x,y){
@@ -322,12 +329,7 @@ function updateStage(){
     word.style.opacity= s.word?'1':'0';
     word.style.transform='translateY(0)';
 
-    // hint更新
-    if(s.roses){
-      hint.style.display='block';
-      hint.style.opacity='0.75';
-      hint.textContent = s.hint;
-    }
+    if(s.roses){ hint.style.display='none'; hint.style.opacity='0'; }
 
     if(s.sub&&!s.roses){
       subtext.innerHTML=s.sub.replace(/\n/g,'<br>');
@@ -338,10 +340,12 @@ function updateStage(){
       if(s.sub) setTimeout(()=>subtext.style.opacity='0.5',800);
       else subtext.style.opacity='0';
     }
+    syncStageNext();
   },600);
 }
 
 function showFinal(){
+  stageNext.style.opacity='0'; stageNext.style.pointerEvents='none';
   word.style.opacity='0'; subtext.style.opacity='0'; roseCanvas.style.opacity='0';
   setTimeout(()=>{
     document.body.style.background='#0a0810';
@@ -352,6 +356,15 @@ function showFinal(){
 }
 
 // タップ対象を全画面に
+function goNext(){
+  if(currentStage<1 || currentStage>=stages.length) return;
+  if(currentStage===stages.length-1){ showFinal(); }
+  else { currentStage++; updateStage(); }
+}
+
+stageNext.addEventListener('touchstart',e=>{ e.stopPropagation(); },{passive:true});
+stageNext.addEventListener('click',e=>{ e.stopPropagation(); goNext(); });
+
 document.getElementById('stage').addEventListener('click',handleTap);
 document.getElementById('stage').addEventListener('touchstart',e=>{e.preventDefault();handleTap(e.touches[0]);},{passive:false});
 
@@ -372,26 +385,25 @@ function handleTap(e){
 
   if(taps===1){
     hint.style.opacity='0'; setTimeout(()=>hint.style.display='none',1000);
-    setTimeout(()=>kg.style.opacity='1',600); setTimeout(()=>kg.style.opacity='0',3500);
   }
 
-  // しきい値でステージ進行
-  if(currentStage < stages.length && taps >= thresholds[currentStage]){
-    if(currentStage === stages.length-1){ showFinal(); }
-    else { currentStage++; updateStage(); }
+  // 初期画面のみタップ回数で次へ
+  if(currentStage===0 && taps>=stages[0].taps){
+    currentStage++;
+    updateStage();
   }
 }
 
 document.getElementById('restart').addEventListener('click',()=>{
   final.classList.remove('visible'); petalActive=false;
   petalCanvas.style.opacity='0'; pctx.clearRect(0,0,petalCanvas.width,petalCanvas.height);
-  currentStage=stages.length-1; taps=thresholds[stages.length-2];
+  currentStage=stages.length-1; taps=20;
   const s=stages[currentStage];
   word.textContent=s.word; word.style.opacity='1'; word.style.transform='translateY(0)';
   document.body.style.background=s.bg;
   subtext.innerHTML=s.sub.replace(/\n/g,'<br>');
   drawRoses();
-  setTimeout(()=>{subtext.style.opacity='1'; roseCanvas.style.opacity='1';},400);
+  setTimeout(()=>{subtext.style.opacity='1'; roseCanvas.style.opacity='1'; syncStageNext();},400);
 });
 
 document.getElementById('start-over')?.addEventListener('click',()=>{
@@ -400,10 +412,11 @@ document.getElementById('start-over')?.addEventListener('click',()=>{
   pctx.clearRect(0,0,petalCanvas.width,petalCanvas.height);
   word.textContent=stages[0].word; word.style.opacity='1'; word.style.transform='translateY(0)';
   word.classList.remove('touched'); subtext.style.opacity='0';
-  document.body.style.background=stages[0].bg; kg.style.opacity='0';
+  document.body.style.background=stages[0].bg;
   lastTapTime=0;
   hint.style.display='block'; hint.textContent='touch to begin';
   setTimeout(()=>hint.style.opacity='0.75',100);
+  syncStageNext();
 });
 </script>
 </body>

@@ -39,6 +39,13 @@
     background:rgba(255,255,255,0.4); transition:width 2s ease;
   }
   #word.touched::after { width:100%; }
+  #word-en {
+    margin-top:0.6rem; font-size:clamp(0.8rem,1.8vw,1.05rem);
+    font-style:italic; letter-spacing:0.1em;
+    color:rgba(255,255,255,0.45); text-align:center;
+    opacity:0; transition:opacity 1.2s ease;
+  }
+  #word-en.visible { opacity:1; }
   #word-note {
     margin-top:0.75rem; font-size:clamp(0.65rem,1.8vw,0.82rem);
     letter-spacing:0.12em; color:rgba(255,255,255,0.42);
@@ -46,6 +53,13 @@
     opacity:0; transition:opacity 0.9s ease; pointer-events:none;
   }
   #word-note.visible { opacity:1; }
+  #word-note-en {
+    margin-top:0.3rem; font-size:clamp(0.6rem,1.5vw,0.72rem);
+    font-style:italic; letter-spacing:0.08em;
+    color:rgba(255,255,255,0.32); text-align:center;
+    opacity:0; transition:opacity 0.9s ease; pointer-events:none;
+  }
+  #word-note-en.visible { opacity:1; }
   #star-name-overlay {
     position:fixed; inset:0; z-index:11; pointer-events:none;
   }
@@ -132,6 +146,12 @@
 <canvas id="rose-canvas"></canvas>
 <canvas id="petal-canvas"></canvas>
 <div id="cursor"></div>
+
+<!-- 音声(自動再生対応:ユーザータップ後に発動) -->
+<audio id="audio-secret-garden" src="/audio/our-secret-garden.mp3" preload="auto"></audio>
+<audio id="audio-brightest-star" src="/audio/my-brightest-star.mp3" preload="auto"></audio>
+<audio id="audio-we-are-here" src="/audio/we-are-here.mp3" preload="auto"></audio>
+
 <div id="star-name-overlay" hidden>
   <div class="star-name-slot"><input type="text" class="star-name-input" maxlength="24" autocomplete="off" aria-label="名前 1" /></div>
   <div class="star-name-slot"><input type="text" class="star-name-input" maxlength="24" autocomplete="off" aria-label="名前 2" /></div>
@@ -141,7 +161,9 @@
 </div>
 <div id="stage">
   <div id="word">二人だけの美しい世界</div>
+  <div id="word-en"></div>
   <div id="word-note"></div>
+  <div id="word-note-en"></div>
   <div id="subtext"></div>
   <button type="button" id="stage-next">→next</button>
   <div id="hint">touch to begin</div>
@@ -176,6 +198,36 @@ class Particle {
   for(let i=particles.length-1;i>=0;i--){particles[i].update();particles[i].draw();if(particles[i].life<=0)particles.splice(i,1);}
   requestAnimationFrame(loop);
 })();
+
+// ---- Audio (一度だけ再生制御) ----
+const audioSecretGarden = document.getElementById('audio-secret-garden');
+const audioBrightestStar = document.getElementById('audio-brightest-star');
+const audioWeAreHere = document.getElementById('audio-we-are-here');
+[audioSecretGarden, audioBrightestStar, audioWeAreHere].forEach(a => { if(a) a.volume = 0.6; });
+
+const playedAudios = new Set(); // 同一セッションで一度だけ再生
+
+function playOnce(audioEl, key){
+  if(!audioEl) return;
+  if(playedAudios.has(key)) return;
+  playedAudios.add(key);
+  // 少し遅らせて場面の文字が現れた後に重ねる
+  setTimeout(()=>{
+    try {
+      audioEl.currentTime = 0;
+      const p = audioEl.play();
+      if(p && typeof p.catch === 'function') p.catch(()=>{ /* 自動再生失敗は静かに無視 */ });
+    } catch(e) { /* noop */ }
+  }, 800);
+}
+
+function resetAudios(){
+  playedAudios.clear();
+  [audioSecretGarden, audioBrightestStar, audioWeAreHere].forEach(a=>{
+    if(!a) return;
+    try { a.pause(); a.currentTime = 0; } catch(e){}
+  });
+}
 
 // ---- Purple rose background (stage 4) ----
 const roseCanvas = document.getElementById('rose-canvas');
@@ -249,7 +301,7 @@ const blueRoses = [
   {x:0.50,y:0.68,s:0.12,h:205},{x:0.10,y:0.65,s:0.10,h:198},
   {x:0.85,y:0.70,s:0.10,h:202},
 ];
-// 一番星シーン（ステージ5）：1紫 2赤 3暗めの黄 4紺 5深緑
+// 一番星シーン(ステージ5):1紫 2赤 3暗めの黄 4紺 5深緑
 const starRosePalette = [
   { h: 280 },
   { h: 2, s1:62, s2:66, s3:70, l1:44, l2:38, l3:32, lc:24, sc:58 },
@@ -330,12 +382,14 @@ const stages=[
   {word:'触れてしまったら\n危うくなってしまう距離もある',  sub:'— 美しい距離 —',                 bg:'#0e0a12', hint:'',                           taps:5},
   {word:'世界が灰色でも\n二人の間だけは色があった',         sub:'',                               bg:'#0c0a14', hint:'', taps:5, roses:'blue'},
   {word:'いつかは\nこの現実の中を歩く',                   sub:'',                               bg:'#0a0a12', hint:'', taps:5, roses:'purple'},
-  {word:'あなたの一番星はだれですか？',                  sub:'',                               bg:'#0a0c12', hint:'', taps:8},
+  {word:'あなたの一番星はだれですか?',                  sub:'',                               bg:'#0a0c12', hint:'', taps:8},
 ];
 const finalLines=['蓋をしても、愛は来る','','それは弱さではなく','生きている証だから。','','ずっと二人はここにいる。'];
 
 const word=document.getElementById('word');
+const wordEn=document.getElementById('word-en');
 const wordNote=document.getElementById('word-note');
+const wordNoteEn=document.getElementById('word-note-en');
 const subtext=document.getElementById('subtext');
 const hint=document.getElementById('hint');
 const final=document.getElementById('final');
@@ -357,13 +411,21 @@ function layoutStarNameSlots(){
 
 function syncStarSceneUi(show){
   if(show){
+    wordEn.textContent='who is your brightest star?';
+    wordEn.classList.add('visible');
     wordNote.textContent='好きな人の名前を書いて';
     wordNote.classList.add('visible');
+    wordNoteEn.textContent='write the name of someone you love';
+    wordNoteEn.classList.add('visible');
     starNameOverlay.hidden=false;
     layoutStarNameSlots();
   } else {
+    wordEn.textContent='';
+    wordEn.classList.remove('visible');
     wordNote.textContent='';
     wordNote.classList.remove('visible');
+    wordNoteEn.textContent='';
+    wordNoteEn.classList.remove('visible');
     starNameOverlay.hidden=true;
   }
 }
@@ -389,7 +451,7 @@ function createRipple(x,y){
   document.body.appendChild(r); setTimeout(()=>r.remove(),2000);
 }
 
-// 花びら揺れエフェクト（水色・紫・一番星バラ場面）
+// 花びら揺れエフェクト(水色・紫・一番星バラ場面)
 function shimmerRoses(){
   rctx.save();
   rctx.globalAlpha=0.06;
@@ -434,6 +496,11 @@ function updateStage(){
       else subtext.style.opacity='0';
     }
     syncStageNext();
+
+    // 場面ごとの音声(一度だけ)
+    if(currentStage===5){
+      playOnce(audioBrightestStar, 'brightest-star');
+    }
   },600);
 }
 
@@ -446,6 +513,8 @@ function showFinal(){
     final.classList.add('visible');
     finalText.innerHTML=finalLines.map(l=>l?`<span>${l}</span>`:'<br>').join('<br>');
     setTimeout(()=>{ petalActive=true; petalCanvas.style.opacity='1'; },1000);
+    // 最終画面の音声(一度だけ)
+    playOnce(audioWeAreHere, 'we-are-here');
   },1000);
 }
 
@@ -463,7 +532,7 @@ document.getElementById('stage').addEventListener('click',handleTap);
 document.getElementById('stage').addEventListener('touchstart',e=>{e.preventDefault();handleTap(e.touches[0]);},{passive:false});
 
 function handleTap(e){
-  // 連打防止：0.8秒インターバル
+  // 連打防止:0.8秒インターバル
   const now = Date.now();
   if(now - lastTapTime < 800) return;
   lastTapTime = now;
@@ -479,6 +548,8 @@ function handleTap(e){
 
   if(taps===1){
     hint.style.opacity='0'; setTimeout(()=>hint.style.display='none',1000);
+    // 最初のタップで世界が開く瞬間の音声
+    playOnce(audioSecretGarden, 'secret-garden');
   }
 
   // 初期画面のみタップ回数で次へ
@@ -489,32 +560,18 @@ function handleTap(e){
 }
 
 document.getElementById('restart').addEventListener('click',()=>{
-  final.classList.remove('visible'); petalActive=false;
-  petalCanvas.style.opacity='0'; pctx.clearRect(0,0,petalCanvas.width,petalCanvas.height);
-  currentStage=stages.length-1; taps=20;
-  const s=stages[currentStage];
-  word.textContent=s.word; word.style.opacity='1'; word.style.transform='translateY(0)';
-  document.body.style.background=s.bg;
-  subtext.innerHTML=s.sub.replace(/\n/g,'<br>');
-  drawRoses();
-  setTimeout(()=>{
-    subtext.style.opacity='1'; roseCanvas.style.opacity='1';
-    syncStarSceneUi(true);
-    syncStageNext();
-  },400);
-});
-
-document.getElementById('start-over')?.addEventListener('click',()=>{
-  taps=0; currentStage=0; final.classList.remove('visible');
-  petalActive=false; petalCanvas.style.opacity='0'; roseCanvas.style.opacity='0';
-  pctx.clearRect(0,0,petalCanvas.width,petalCanvas.height);
-  word.textContent=stages[0].word; word.style.opacity='1'; word.style.transform='translateY(0)';
-  word.classList.remove('touched'); subtext.style.opacity='0';
+  final.classList.remove('visible');
+  petalActive=false; petalCanvas.style.opacity='0';
+  taps=0; currentStage=0;
+  resetAudios();
+  word.classList.remove('touched');
   syncStarSceneUi(false);
-  document.body.style.background=stages[0].bg;
-  lastTapTime=0;
-  hint.style.display='block'; hint.textContent='touch to begin';
-  setTimeout(()=>hint.style.opacity='0.75',100);
+  document.body.style.background='#0a0a0f';
+  word.textContent=stages[0].word;
+  word.style.opacity='1';
+  subtext.style.opacity='0';
+  hint.style.display='block'; hint.style.opacity='';
+  hint.textContent='touch to begin';
   syncStageNext();
 });
 </script>

@@ -410,7 +410,9 @@ const stages=[
   {word:'いつかは\nこの現実の中を歩く',                   sub:'',                               bg:'#0a0a12', hint:'', taps:5, roses:'purple'},
   {word:'あなたの一番星はだれですか?',                  sub:'',                               bg:'#0a0c12', hint:'', taps:8},
 ];
-const finalLines=['蓋をしても、愛は来る','','それは弱さではなく','生きている証だから。','','ずっと二人はここにいる。'];
+const finalLines=['蓋をしても、愛は来る','','それは弱さではなく','生きている証だから',''];
+const finalLastLine='ずっと二人はここにいる';
+let finalTypeTimer=null;
 
 const word=document.getElementById('word');
 const wordEn=document.getElementById('word-en');
@@ -537,10 +539,21 @@ function showFinal(){
   stopRoseSpin();
   stageNext.style.opacity='0'; stageNext.style.pointerEvents='none';
   word.style.opacity='0'; subtext.style.opacity='0'; roseCanvas.style.opacity='0';
+  if(finalTypeTimer){ clearInterval(finalTypeTimer); finalTypeTimer=null; }
   setTimeout(()=>{
     document.body.style.background='#0a0810';
     final.classList.add('visible');
-    finalText.innerHTML=finalLines.map(l=>l?`<span>${l}</span>`:'<br>').join('<br>');
+    finalText.innerHTML=finalLines.map(l=>l?`<span>${l}</span>`:'<br>').join('<br>')+'<br><span id="final-last-line"></span>';
+    const lastEl=document.getElementById('final-last-line');
+    let i=0;
+    finalTypeTimer=setInterval(()=>{
+      if(i>=finalLastLine.length){
+        clearInterval(finalTypeTimer);
+        finalTypeTimer=null;
+        return;
+      }
+      lastEl.textContent+=finalLastLine[i++];
+    },360);
     setTimeout(()=>{ petalActive=true; petalCanvas.style.opacity='1'; },1000);
     // 最終画面の音声(一度だけ)
     playOnce(audioWeAreHere, 'we-are-here');
@@ -589,6 +602,7 @@ function handleTap(e){
 }
 
 document.getElementById('restart').addEventListener('click',()=>{
+  if(finalTypeTimer){ clearInterval(finalTypeTimer); finalTypeTimer=null; }
   final.classList.remove('visible');
   petalActive=false; petalCanvas.style.opacity='0';
   taps=0; currentStage=0;

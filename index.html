@@ -104,7 +104,8 @@
   }
   #stage-next:hover { color:rgba(255,255,255,0.9); border-color:rgba(255,255,255,0.45); }
   #stage-next.stage-next-blue,
-  #stage-next.stage-next-star {
+  #stage-next.stage-next-star,
+  #stage-next.stage-next-purple {
     position:fixed; bottom:2.5rem; left:50%;
     transform:translateX(-50%); margin-top:0; z-index:12;
   }
@@ -246,7 +247,7 @@ function resetAudios(){
 const roseCanvas = document.getElementById('rose-canvas');
 const rctx = roseCanvas.getContext('2d');
 roseCanvas.width = innerWidth; roseCanvas.height = innerHeight;
-window.addEventListener('resize', ()=>{ roseCanvas.width=innerWidth; roseCanvas.height=innerHeight; if(typeof currentStage!=='undefined') drawRoses(); });
+window.addEventListener('resize', ()=>{ roseCanvas.width=innerWidth; roseCanvas.height=innerHeight; if(typeof currentStage!=='undefined'){ if(blueFallActive&&currentStage===2) startBlueFall(); else drawRoses(); } });
 
 function drawSinglePetal(cx, cy, len, wid, angle, color, alpha){
   rctx.save();
@@ -257,6 +258,24 @@ function drawSinglePetal(cx, cy, len, wid, angle, color, alpha){
   rctx.moveTo(0, -len);
   rctx.bezierCurveTo(-wid*1.2, -len*0.3, -wid*1.4, len*0.4, 0, len*0.9);
   rctx.bezierCurveTo( wid*1.4,  len*0.4,  wid*1.2, -len*0.3, 0, -len);
+  rctx.fillStyle = color;
+  rctx.fill();
+  rctx.strokeStyle = color;
+  rctx.lineWidth = 0.3;
+  rctx.stroke();
+  rctx.restore();
+}
+
+function drawFallPetal(cx, cy, len, wid, angle, color, alpha){
+  rctx.save();
+  rctx.translate(cx, cy);
+  rctx.rotate(angle);
+  rctx.globalAlpha = alpha;
+  rctx.beginPath();
+  rctx.moveTo(0, -len);
+  rctx.bezierCurveTo(-wid*1.2, -len*0.3, -wid*1.4, len*0.26, -wid*0.52, len*0.48);
+  rctx.quadraticCurveTo(0, len*0.96, wid*0.52, len*0.48);
+  rctx.bezierCurveTo(wid*1.4, len*0.32, wid*1.2, -len*0.3, 0, -len);
   rctx.fillStyle = color;
   rctx.fill();
   rctx.strokeStyle = color;
@@ -319,6 +338,63 @@ const blueRoses = [
   {x:0.50,y:0.68,s:0.12,h:205},{x:0.10,y:0.65,s:0.10,h:198},
   {x:0.85,y:0.70,s:0.10,h:202},
 ];
+let blueFallActive=false, blueFallPetals=[], blueFallStart=0, blueFallRaf=null;
+class BlueFallPetal{
+  constructor(){
+    const rose=blueRoses[2];
+    const minSz=Math.min(innerWidth,innerHeight);
+    const bs=rose.s*minSz;
+    this.x=innerWidth*0.5;
+    this.startY=-bs*0.8;
+    this.y=this.startY;
+    this.targetX=innerWidth*0.5;
+    this.targetY=innerHeight+bs*0.1;
+    this.duration=12000;
+    this.len=bs*0.42;
+    this.wid=this.len*0.28;
+    this.angle=Math.random()*Math.PI*2;
+    this.rotSpeed=0.004;
+    this.hue=rose.h;
+    this.light=38;
+    this.alpha=0.22;
+    this.swayAmp=28;
+    this.done=false;
+  }
+  update(elapsed){
+    const t=Math.min(1,elapsed/this.duration);
+    if(t>=1){ this.done=true; return false; }
+    const ease=1-Math.pow(1-t,2.2);
+    this.y=this.startY+(this.targetY-this.startY)*ease;
+    this.x=this.targetX+Math.sin(t*Math.PI*1.5)*this.swayAmp*(1-t*0.3);
+    this.angle+=this.rotSpeed;
+    return true;
+  }
+  draw(){
+    drawFallPetal(this.x,this.y,this.len,this.wid,this.angle,
+      `hsl(${this.hue},58%,${this.light}%)`,this.alpha);
+  }
+}
+function startBlueFall(){
+  stopBlueFall();
+  blueFallActive=true;
+  blueFallPetals=[new BlueFallPetal()];
+  roseCanvas.style.opacity='1';
+  blueFallStart=performance.now();
+  function tick(now){
+    if(!blueFallActive) return;
+    const elapsed=now-blueFallStart;
+    rctx.clearRect(0,0,roseCanvas.width,roseCanvas.height);
+    let anyVisible=false;
+    blueFallPetals.forEach(p=>{ if(p.update(elapsed)){ p.draw(); anyVisible=true; } });
+    if(elapsed<12200||anyVisible) blueFallRaf=requestAnimationFrame(tick);
+  }
+  blueFallRaf=requestAnimationFrame(tick);
+}
+function stopBlueFall(){
+  blueFallActive=false;
+  if(blueFallRaf){ cancelAnimationFrame(blueFallRaf); blueFallRaf=null; }
+  blueFallPetals=[];
+}
 // 一番星シーン(ステージ5):1紫 2赤 3暗めの黄 4紺 5深緑
 const starRosePalette = [
   { h: 280 },
@@ -484,6 +560,7 @@ function syncStageNext(){
   stageNext.style.opacity = show ? '1' : '0';
   stageNext.style.pointerEvents = show ? 'auto' : 'none';
   stageNext.classList.toggle('stage-next-blue', currentStage===3);
+  stageNext.classList.toggle('stage-next-purple', currentStage===4);
   stageNext.classList.toggle('stage-next-star', currentStage===5);
 }
 
@@ -515,9 +592,10 @@ function updateStage(){
   word.style.opacity='0'; word.style.transform='translateY(10px)'; subtext.style.opacity='0';
 
   // バラ背景の切り替え
-  if(s.roses==='blue'){ drawRoses(); setTimeout(()=>roseCanvas.style.opacity='1',400); }
-  else if(s.roses==='purple'||currentStage===5){ drawRoses(); setTimeout(()=>roseCanvas.style.opacity='1',400); }
-  else { roseCanvas.style.opacity='0'; }
+  if(s.roses==='blue'){ stopBlueFall(); drawRoses(); setTimeout(()=>roseCanvas.style.opacity='1',400); }
+  else if(s.roses==='purple'||currentStage===5){ stopBlueFall(); drawRoses(); setTimeout(()=>roseCanvas.style.opacity='1',400); }
+  else if(currentStage===2){ stopBlueFall(); startBlueFall(); }
+  else { stopBlueFall(); roseCanvas.style.opacity='0'; }
 
   setTimeout(()=>{
     word.textContent = s.word||'';
@@ -551,6 +629,7 @@ function updateStage(){
 function showFinal(){
   syncStarSceneUi(false);
   stopRoseSpin();
+  stopBlueFall();
   stageNext.style.opacity='0'; stageNext.style.pointerEvents='none';
   word.style.opacity='0'; subtext.style.opacity='0'; roseCanvas.style.opacity='0';
   if(finalTypeTimer){ clearInterval(finalTypeTimer); finalTypeTimer=null; }
@@ -623,6 +702,7 @@ document.getElementById('restart').addEventListener('click',()=>{
   resetAudios();
   word.classList.remove('touched');
   syncStarSceneUi(false);
+  stopBlueFall();
   document.body.style.background='#0a0a0f';
   word.textContent=stages[0].word;
   word.style.opacity='1';

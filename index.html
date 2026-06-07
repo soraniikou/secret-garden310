@@ -73,7 +73,7 @@
     width:min(22vw,7.5rem); min-width:4rem;
     padding:0.15rem 0.25rem 0.05rem;
     font-family:'Noto Serif JP','Cormorant Garamond',serif;
-    font-size:clamp(0.496rem,1.28vw,0.624rem); letter-spacing:0.08em;
+    font-size:clamp(0.694rem,1.792vw,0.874rem); letter-spacing:0.08em;
     color:rgba(255,255,255,0.88);
     background:transparent; border:none;
     border-bottom:1px solid rgba(255,255,255,0.45);
@@ -103,6 +103,11 @@
     opacity:0; pointer-events:none;
   }
   #stage-next:hover { color:rgba(255,255,255,0.9); border-color:rgba(255,255,255,0.45); }
+  #stage-next.stage-next-blue,
+  #stage-next.stage-next-star {
+    position:fixed; bottom:2.5rem; left:50%;
+    transform:translateX(-50%); margin-top:0; z-index:12;
+  }
   #cursor {
     position:fixed; width:6px; height:6px; border-radius:50%;
     background:rgba(255,255,255,0.6); pointer-events:none;
@@ -140,6 +145,13 @@
     transform:translate(-50%,-50%) scale(0); animation:ripple-out 2s ease-out forwards;
   }
   @keyframes ripple-out { to{transform:translate(-50%,-50%) scale(1);opacity:0} }
+  @media (hover:hover) and (pointer:fine) and (min-width:768px) {
+    #word { font-size:clamp(0.896rem,1.92vw,1.408rem); }
+    #word-note { font-size:clamp(0.52rem,1.44vw,0.656rem); }
+    #subtext { font-size:clamp(0.48rem,1.28vw,0.576rem); }
+    #final-text { font-size:clamp(0.64rem,1.92vw,1.024rem); }
+    .star-name-input { font-size:clamp(0.555rem,1.434vw,0.699rem); }
+  }
 </style>
 </head>
 <body>
@@ -405,12 +417,12 @@ drawRoses();
 const stages=[
   {word:'二人だけの美しい世界',                          sub:'',                               bg:'#0a0a0f', hint:'touch to begin',            taps:1},
   {word:'誰かに許されなくても',                          sub:'あなたとなら',                    bg:'#0d0a14', hint:'',                           taps:5},
-  {word:'触れてしまったら\n危うくなってしまう距離もある',  sub:'— 美しい距離 —',                 bg:'#0e0a12', hint:'',                           taps:5},
-  {word:'世界が灰色でも\n二人の間だけは色があった',         sub:'',                               bg:'#0c0a14', hint:'', taps:5, roses:'blue'},
-  {word:'いつかは\nこの現実の中を歩く',                   sub:'',                               bg:'#0a0a12', hint:'', taps:5, roses:'purple'},
+  {word:'触れてしまうのが怖い気もする',                  sub:'— 美しい距離 —',                 bg:'#0e0a12', hint:'',                           taps:5},
+  {word:'世界が灰色でも\n二人の間だけは色があった',         sub:'',                               bg:'#18181a', hint:'', taps:5, roses:'blue'},
+  {word:'現実と内面の自分を行き来する',                   sub:'',                               bg:'#0a0a12', hint:'', taps:5, roses:'purple'},
   {word:'あなたの一番星はだれですか?',                  sub:'',                               bg:'#0a0c12', hint:'', taps:8},
 ];
-const finalLines=['蓋をしても、愛は来る','','それは弱さではなく','生きている証だから',''];
+const finalLines=['閉じ込めようとしても　消せない思い','','それは弱さではなく','生きている証だから',''];
 const finalLastLine='ずっと二人はここにいる';
 let finalTypeTimer=null;
 
@@ -471,6 +483,8 @@ function syncStageNext(){
   const show = currentStage>=1 && currentStage<stages.length && !final.classList.contains('visible');
   stageNext.style.opacity = show ? '1' : '0';
   stageNext.style.pointerEvents = show ? 'auto' : 'none';
+  stageNext.classList.toggle('stage-next-blue', currentStage===3);
+  stageNext.classList.toggle('stage-next-star', currentStage===5);
 }
 
 function spawnParticles(x,y,n=12){for(let i=0;i<n;i++)particles.push(new Particle(x,y,currentStage));}
